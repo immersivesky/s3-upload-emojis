@@ -19,7 +19,7 @@ func main() {
 	client := s3.NewS3("emojis")
 
 	count, size := client.GetObjectCount(), client.GetSize()
-	fmt.Printf("Bucket: %s | Count: %s, count: %s", client.BucketName, size, count)
+	fmt.Printf("Bucket: %s | Count: %s, count: %s\n", client.BucketName, size, count)
 
 	parseHTML(client)
 }
@@ -34,19 +34,15 @@ func parseHTML(s3 *s3.S3) {
 	collector := colly.NewCollector()
 	collector.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
 
-	ch := make(chan int)
-	collector.OnHTML("div.col-md-2.col-sm-3.col-xs-6.platform-grid-child.p-0", onHTML(s3, ch))
-	<-ch
+	collector.OnHTML("div.col-md-2.col-sm-3.col-xs-6.platform-grid-child.p-0", onHTML(s3))
 
 	if err := collector.Visit("https://emojik.com/facebook"); err != nil {
 		panic(err)
 	}
 }
 
-func onHTML(s3 *s3.S3, ch chan int) colly.HTMLCallback {
+func onHTML(s3 *s3.S3) colly.HTMLCallback {
 	return func(element *colly.HTMLElement) {
-		ch <- 1
-
 		emoji := Emoji{
 			Symbol:   element.ChildText("div.symbol-emoji"),
 			PhotoURL: element.ChildAttr("span", "data-name"),
