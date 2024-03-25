@@ -30,7 +30,7 @@ func NewS3(bucketName string) *S3 {
 	}
 }
 
-func (service S3) Upload(reader io.Reader, objectName string) {
+func (service S3) Upload(reader io.Reader, objectName string) string {
 	uploader := manager.NewUploader(service.Client)
 	out, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
 		Bucket: &service.BucketName,
@@ -42,7 +42,7 @@ func (service S3) Upload(reader io.Reader, objectName string) {
 		panic(err)
 	}
 
-	fmt.Println("Uploaded location:", out.Location)
+	return out.Location
 }
 
 func (service S3) GetSize() string {

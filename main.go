@@ -48,16 +48,22 @@ func onHTML(s3 *s3.S3) colly.HTMLCallback {
 			PhotoURL: element.ChildAttr("span", "data-name"),
 		}
 
-		fmt.Println("PhotoURL:", emoji.PhotoURL)
-
 		if link := strings.SplitAfterN(emoji.PhotoURL, ".png", -1); len(link) > 0 {
 			emoji.PhotoURL = link[0]
 			editName(&emoji)
 
-			var writer bytes.Buffer
-			convert.PNGToWEBP(image.GetImage(emoji.PhotoURL), &writer)
+			emoji.PhotoURL = strings.ReplaceAll(emoji.PhotoURL, "\\", "/")
 
-			s3.Upload(&writer, "facebook/4.0/webp/"+emoji.Name+".webp")
+			img, err := image.GetImage(emoji.PhotoURL)
+			if err != nil {
+				fmt.Printf("❌ Error: %v\n\t➜ Name: %s\n\t➜ URL: %s\n", err, emoji.Name, emoji.PhotoURL)
+			} else {
+				var writer bytes.Buffer
+				convert.PNGToWEBP(img, &writer)
+
+				location := s3.Upload(&writer, "facebook/4.0/webp/"+emoji.Name+".webp")
+				fmt.Printf("✅ Success! | Name: %s\n\t➜ URL: %s\n\t➜ S3 Location: %s\n", emoji.Name, emoji.PhotoURL, location)
+			}
 		} else {
 			panic(link)
 		}

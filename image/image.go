@@ -4,20 +4,19 @@ import (
 	"image"
 	"image/png"
 	"net/http"
-	"strings"
 )
 
-func GetImage(photoURL string) image.Image {
-	res, err := http.Get(strings.ReplaceAll(photoURL, "\\", "/"))
+func GetImage(photoURL string) (image.Image, error) {
+	res, err := http.Get(photoURL)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	img, err := png.Decode(res.Body)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return img
+	return img, nil
 }
