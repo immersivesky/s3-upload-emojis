@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"github.com/immersivesky/s3-upload-emojis/internal/core/domain"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -9,6 +10,10 @@ import (
 type DB struct {
 	pool *pgxpool.Pool
 }
+
+var (
+	errLessThan = errors.New("returned number less than 0")
+)
 
 func NewDB(dsn string) (*DB, error) {
 	pool, err := pgxpool.New(context.TODO(), dsn)
@@ -25,27 +30,38 @@ func NewDB(dsn string) (*DB, error) {
 	}, nil
 }
 
-func (db *DB) GetEmojiPack(source string, sourceID int) (*domain.EmojiPack, error) {
-	emojiPack := &domain.EmojiPack{}
+func (db *DB) GetEmojiPacksBySource(source string, sourceID int) ([]*domain.EmojiPack, error) {
+	emojiPacks := make([]*domain.EmojiPack, 0, 4)
 
-	if err := db.pool.QueryRow(
+	rows, err := db.pool.Query(
 		context.TODO(),
-		"SELECT emoji_pack_id, name FROM emoji_pack WHERE source = $1 AND source_id = $1;",
+		"SELECT emoji_pack_id, name FROM emoji_pack WHERE source_type = $1 AND source_id = $2;",
 		source, sourceID,
-	).Scan(&emojiPack.ID, &emojiPack.Name); err != nil {
+	)
+	if err != nil {
 		return nil, err
 	}
 
-	return emojiPack, nil
+	for rows.Next() {
+		emojiPack := new(domain.EmojiPack)
+
+		if err := rows.Scan(&emojiPack.ID, &emojiPack.Name); err != nil {
+			return nil, err
+		}
+
+		emojiPacks = append(emojiPacks, emojiPack)
+	}
+
+	return emojiPacks, nil
 }
 
-func (db *DB) GetEmoji(packID, offset, count int) ([]*domain.Emoji, error) {
-	emojis := []*domain.Emoji{}
+func (db *DB) GetEmojisByEmojiPack(emojiPackID, offset, count int) ([]*domain.Emoji, error) {
+	emojis := make([]*domain.Emoji, 0, 4)
 
 	rows, err := db.pool.Query(
 		context.TODO(),
 		"SELECT emoji_id, photo_path FROM emoji WHERE fk_emoji_pack_id = $1 OFFSET $2 LIMIT $3;",
-		packID, offset, count,
+		emojiPackID, offset, count,
 	)
 	if err != nil {
 		return nil, err
@@ -65,7 +81,7 @@ func (db *DB) GetEmoji(packID, offset, count int) ([]*domain.Emoji, error) {
 }
 
 func (db *DB) GetEmojisByShortCode(shortCode string) ([]*domain.Emoji, error) {
-	emojis := []*domain.Emoji{}
+	emojis := make([]*domain.Emoji, 0, 4)
 
 	rows, err := db.pool.Query(
 		context.TODO(),
@@ -89,43 +105,60 @@ func (db *DB) GetEmojisByShortCode(shortCode string) ([]*domain.Emoji, error) {
 	return emojis, nil
 }
 
-func (db *DB) CreateEmojiPack(source string, sourceID int, name string) (int, error) {
+func (db *DB) CreateEmojiPack(sourceType string, sourceID int, name, version string) (int, error) {
 	var emojiPackID int
 
 	if err := db.pool.QueryRow(
 		context.TODO(),
-		"INSERT INTO emoji_pack(source, source_id, name) VALUES($1, $2, $3) RETURNING emoji_pack_id;",
-		source, sourceID, name,
+		"INSERT INTO emoji_pack(source_type, source_id, name, version) VALUES($1, $2, $3, $4) RETURNING emoji_pack_id;",
+		sourceType, sourceID, name, version,
 	).Scan(&emojiPackID); err != nil {
 		return emojiPackID, err
+	}
+
+	if emojiPackID <= 0 {
+		return 0, errLessThan
 	}
 
 	return emojiPackID, nil
 }
 
+// CreateEmoji - запись эмодзи в БД
+// Принимает пак эмодзи и относительный путь к фотографии
+// Возвращает ID эмодзи
 func (db *DB) CreateEmoji(emojiPackID int, photoPath string) (int, error) {
 	var emojiID int
 
 	if err := db.pool.QueryRow(
 		context.TODO(),
-		"INSERT INTO emoji(fk_emoji_pack_id, photo_path) VALUES ($1, $2) RETURNING emoji_id;",
-		emojiPackID, photoPath,
+		"INSERT INTO emoji(photo_path, fk_emoji_pack_id) VALUES ($1, $2) RETURNING emoji_id;",
+		photoPath, emojiPackID,
 	).Scan(&emojiID); err != nil {
 		return emojiID, err
+	}
+
+	if emojiID <= 0 {
+		return 0, errLessThan
 	}
 
 	return emojiID, nil
 }
 
+// CreateEmojiShortCode - запись короткого кода эмодзи в БД
+// Принимает ID эмодзи и его символ
 func (db *DB) CreateEmojiShortCode(emojiID int, shortCode string) (int, error) {
 	var emojiShortCodeID int
 
 	if err := db.pool.QueryRow(
 		context.TODO(),
-		"INSERT INTO emoji_shortcode(fk_emoji_id, shortcode) VALUES ($1, $2) RETURNING ;",
+		"INSERT INTO emoji_shortcode(fk_emoji_id, shortcode) VALUES ($1, $2) RETURNING emoji_shortcode_id;",
 		emojiID, shortCode,
 	).Scan(&emojiShortCodeID); err != nil {
 		return emojiShortCodeID, err
+	}
+
+	if emojiShortCodeID <= 0 {
+		return 0, errLessThan
 	}
 
 	return emojiShortCodeID, nil

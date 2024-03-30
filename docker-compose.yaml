@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16.0-alpine3.18
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=das
+      - POSTGRES_PASSWORD=yree
+      - POSTGRES_DB=uid
+  app:
+    build: .
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      - POSTGRESQL_URL=postgresql://das:yree@db:5432/uid
+    container_name: app

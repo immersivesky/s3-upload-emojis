@@ -1,5 +1,6 @@
 package convert
 
+/*
 import (
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
@@ -17,3 +18,4 @@ func PNGToWEBP(img image.Image, writer io.Writer) {
 		panic(err)
 	}
 }
+*/
