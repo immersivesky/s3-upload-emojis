@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/gocolly/colly"
+	"github.com/immersivesky/s3-upload-emojis/convert"
 	"github.com/immersivesky/s3-upload-emojis/image"
 	"github.com/immersivesky/s3-upload-emojis/internal/adapters/repository"
 	"github.com/immersivesky/s3-upload-emojis/location"
@@ -35,9 +36,9 @@ func On(s3 *s3.S3, db *repository.DB, location location.Location, logger *zap.Lo
 				getName(location.Name, spanImg),
 				getPhotoURL(spanImg),
 			)
-			writer bytes.Buffer
-			path   = getPath(location.Name, location.Version, emoji.Name)
-			_, err = image.GetImage(emoji.PhotoURL)
+			writer   bytes.Buffer
+			path     = getPath(location.Name, location.Version, emoji.Name)
+			img, err = image.GetImage(emoji.PhotoURL)
 		)
 		if err != nil {
 			logger.Error("Error",
@@ -49,10 +50,17 @@ func On(s3 *s3.S3, db *repository.DB, location location.Location, logger *zap.Lo
 			return
 		}
 
-		// convert.PNGToWEBP(img, &writer)
+		convert.PNGToWEBP(img, &writer)
 		s3.Upload(&writer, path)
 
-		/*emojiID, err := db.CreateEmoji(location.EmojiPackID, path)
+		// чтобы получить ссылку на URL, необходимо сначала разрезать строку
+		// при помощи символа -|/ или -| и получить срез 2 элементов
+		// 1 элемент - название S3 бакета, 2 - путь к файлу
+		// нужно это, чтобы в случае перехода на другой домен не пришлось изменять записи
+		// мне к примеру удобно обходить CDN, поскольку он кэширует на 4 дня
+		// а пользователям наоборот, нужен близлежащий к ним кэш
+		// т.е. мы обращаемся к разным сервисам на разных поддоменах cdn.emojis и emojis
+		emojiID, err := db.CreateEmoji(location.EmojiPackID, "emojis-|/"+path)
 		if err != nil {
 			panic(err)
 		}
@@ -62,14 +70,16 @@ func On(s3 *s3.S3, db *repository.DB, location location.Location, logger *zap.Lo
 			panic(err)
 		}
 
-		logger.Info("Success",
+		fmt.Println(emojiShortCodeID)
+
+		/*logger.Info("Success",
 			zap.String("Name", emoji.Name),
 			zap.String("URL", emoji.PhotoURL),
 			zap.String("S3 Path", path),
 			zap.String("EmojiID", fmt.Sprint(emojiID)),
 			zap.String("ShortCodeID", fmt.Sprint(emojiShortCodeID)),
 			zap.String("ShortCode", emoji.Symbol),
-		)*/// это я убрал потому, что мне впадлу разбираться в ELK
+		)*/ // это я убрал потому, что мне впадлу разбираться в ELK
 	}
 }
 
