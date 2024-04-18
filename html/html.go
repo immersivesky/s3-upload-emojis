@@ -65,12 +65,11 @@ func On(s3 *s3.S3, db *repository.DB, location location.Location, logger *zap.Lo
 			panic(err)
 		}
 
-		emojiShortCodeID, err := db.CreateEmojiShortCode(emojiID, emoji.Symbol)
+		_, err = db.CreateEmojiShortCode(emojiID, emoji.Symbol)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println(emojiShortCodeID)
 
 		/*logger.Info("Success",
 			zap.String("Name", emoji.Name),

@@ -35,7 +35,7 @@ func main() {
 		Addr: "127.0.0.1:6379",
 	})
 
-	redisWriter := rw.NewRedisWriter(cli, "error_logs")
+	redisWriter := rw.NewRedisWriter(cli, "logs")
 
 	logger := logger.NewZapLogger(redisWriter)
 
